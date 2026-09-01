@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Room Cooling Optimisation — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0d2b45; --navy-2:#103a5c; --teal:#0d9488; --teal-soft:#ccfbf1;
+    --bg:#eef2f6; --surface:#fff; --line:#e3e9f0; --ink:#0f2033; --ink-2:#46586c; --muted:#8496a8;
+    --ok:#16a34a; --ok-soft:#dcfce7; --warn:#d97706; --warn-soft:#fef3c7;
+    --hot:#dc2626; --hot-soft:#fee2e2; --info:#2563eb; --info-soft:#dbeafe;
+    --radius:14px; --shadow:0 1px 2px rgba(15,32,51,.04),0 6px 20px rgba(15,32,51,.06);
+    --font:'Inter',system-ui,-apple-system,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:var(--font); background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+    display:grid; grid-template-columns:224px 1fr; min-height:100vh; }
+
+  .sidebar { background:var(--navy); color:#cfe0ee; padding:22px 14px; display:flex; flex-direction:column;
+    gap:6px; position:sticky; top:0; height:100vh; }
+  .brand { display:flex; align-items:center; gap:11px; padding:4px 8px 20px;
+    border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:12px; }
+  .brand .mark { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,var(--teal),#38bdf8);
+    display:grid; place-items:center; font-size:18px; flex-shrink:0; }
+  .brand b { color:#fff; font-size:14px; line-height:1.2; font-weight:600; }
+  .brand span { display:block; font-size:11px; color:#7f9bb5; font-weight:400; }
+  .nav-item { display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:9px;
+    color:#a9c0d6; font-size:13.5px; font-weight:500; cursor:pointer; transition:background .15s,color .15s; }
+  .nav-item .ico { width:18px; text-align:center; font-size:15px; }
+  .nav-item:hover { background:rgba(255,255,255,.06); color:#eaf2fa; }
+  .nav-item.active { background:var(--teal); color:#fff; }
+  .nav-spacer { flex:1; }
+  .nav-foot { font-size:11px; color:#6f8ba6; padding:12px 12px 0; border-top:1px solid rgba(255,255,255,.08); }
+
+  .main { padding:20px 26px 40px; min-width:0; }
+  .topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:22px; }
+  .topbar h1 { font-size:19px; font-weight:700; letter-spacing:-.01em; }
+  .topbar .sub { font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .top-right { display:flex; align-items:center; gap:14px; }
+  .pill { display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border-radius:999px;
+    font-size:12.5px; font-weight:600; background:var(--ok-soft); color:var(--ok); }
+  .pill.off { background:var(--hot-soft); color:var(--hot); }
+  .dot { width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .pill .dot { animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .clock { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--ink-2); }
+  .src-chip { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line); font-size:12px; color:var(--ink-2); font-family:var(--mono); }
+  .src-chip b { color:var(--ink); font-weight:600; }
+  .src-chip .sico { font-size:12px; }
+  .avatar { width:34px; height:34px; border-radius:50%; background:var(--navy-2); color:#fff;
+    display:grid; place-items:center; font-size:13px; font-weight:600; }
+
+  .kpi-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-bottom:16px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .kpi { padding:16px 16px 15px; }
+  .kpi .khead { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .kpi .klabel { font-size:11.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .kpi .kico { width:30px; height:30px; border-radius:8px; display:grid; place-items:center; font-size:15px; }
+  .kpi .kval { font-family:var(--mono); font-size:27px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .kpi .kval small { font-size:14px; color:var(--muted); font-weight:500; margin-left:2px; }
+  .kpi .ksub { font-size:11.5px; color:var(--muted); margin-top:6px; }
+  .kpi.tall .kval { font-size:21px; }
+
+  .state-ok{color:var(--ok)} .state-warn{color:var(--warn)} .state-hot{color:var(--hot)} .state-info{color:var(--info)}
+  .bg-ok{background:var(--ok-soft);color:var(--ok)} .bg-warn{background:var(--warn-soft);color:var(--warn)}
+  .bg-hot{background:var(--hot-soft);color:var(--hot)} .bg-info{background:var(--info-soft);color:var(--info)}
+  .bg-teal{background:var(--teal-soft);color:var(--teal)}
+
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1.15fr; gap:14px; margin-bottom:16px; }
+  .panel { padding:16px 17px; }
+  .panel>.ptitle { display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:700; margin-bottom:14px; }
+  .ptitle .badge { margin-left:auto; font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; }
+
+  .reco-main { display:flex; gap:12px; align-items:flex-start; padding:13px; border-radius:10px;
+    margin-bottom:12px; border:1px solid var(--line); }
+  .reco-main .rico { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; flex-shrink:0; font-size:15px; }
+  .reco-main .rtxt b { font-size:13.5px; display:block; }
+  .reco-main .rtxt span { font-size:12px; color:var(--ink-2); }
+  .reco-list { display:flex; flex-direction:column; gap:9px; }
+  .reco-item { display:flex; gap:9px; align-items:flex-start; font-size:12.5px; }
+  .reco-item .rmark { width:16px; height:16px; border-radius:50%; display:grid; place-items:center;
+    font-size:10px; color:#fff; flex-shrink:0; margin-top:1px; }
+  .reco-item b { display:block; } .reco-item span { color:var(--muted); }
+
+  .btn-col { display:flex; flex-direction:column; gap:9px; }
+  .obtn { display:flex; align-items:center; gap:10px; padding:11px 13px; border-radius:10px; border:1px solid var(--line);
+    background:#fbfcfe; font-size:13px; font-weight:600; color:var(--ink-2); cursor:pointer; text-align:left;
+    width:100%; font-family:var(--font); transition:border-color .15s,background .15s,transform .05s; }
+  .obtn .oico { width:17px; text-align:center; }
+  .obtn:hover { border-color:var(--teal); background:#fff; color:var(--ink); }
+  .obtn:active { transform:translateY(1px); }
+  .obtn.on:hover { border-color:var(--ok); color:var(--ok); }
+  .obtn.off:hover { border-color:var(--hot); color:var(--hot); }
+  .obtn.auto { background:var(--navy); color:#fff; border-color:var(--navy); justify-content:center; }
+  .obtn.auto:hover { background:var(--navy-2); color:#fff; }
+
+  .alert-list { display:flex; flex-direction:column; }
+  .alert-item { display:flex; gap:11px; padding:11px 4px; border-bottom:1px solid var(--line); align-items:flex-start; }
+  .alert-item:last-of-type { border-bottom:none; }
+  .alert-item .aico { width:26px; height:26px; border-radius:7px; display:grid; place-items:center; font-size:13px; flex-shrink:0; }
+  .alert-item .abody { flex:1; min-width:0; }
+  .alert-item .abody b { font-size:12.5px; display:block; }
+  .alert-item .abody span { font-size:11.5px; color:var(--muted); }
+  .alert-item .atime { font-family:var(--mono); font-size:11px; color:var(--muted); flex-shrink:0; }
+  .link-more { display:inline-block; margin-top:10px; font-size:12px; font-weight:600; color:var(--teal); cursor:pointer; }
+
+  .row-hist { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; }
+  .chart-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .tabs { display:flex; gap:4px; background:var(--bg); padding:3px; border-radius:8px; }
+  .tab { font-size:11.5px; font-weight:600; color:var(--muted); padding:5px 10px; border-radius:6px; cursor:pointer; }
+  .tab.active { background:#fff; color:var(--ink); box-shadow:var(--shadow); }
+  .chart-wrap { height:210px; margin-top:6px; }
+
+  table { width:100%; border-collapse:collapse; }
+  thead th { font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+    text-align:left; padding:0 8px 9px; font-weight:600; }
+  tbody td { font-size:12px; padding:9px 8px; border-top:1px solid var(--line); color:var(--ink-2); }
+  tbody td:first-child { font-family:var(--mono); color:var(--muted); white-space:nowrap; }
+  .tag { font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:999px; }
+
+  .statusbar { margin-top:18px; padding:12px 17px; background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); display:flex; gap:26px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+  .statusbar b { color:var(--ink-2); font-weight:600; }
+
+  /* ---- tab views ---- */
+  .view { display:none; }
+  .view.active { display:block; }
+  .view-head { font-size:16px; font-weight:700; margin:2px 0 14px; }
+  .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px; }
+  .stat { padding:16px; }
+  .stat .slabel { font-size:11.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .stat .sval { font-family:var(--mono); font-size:24px; font-weight:700; margin-top:8px; letter-spacing:-.02em; }
+  .big-table-wrap { max-height:440px; overflow:auto; }
+  .kv { display:flex; justify-content:space-between; padding:11px 2px; border-bottom:1px solid var(--line); font-size:13px; color:var(--ink-2); }
+  .kv:last-child { border-bottom:none; }
+  .kv b { color:var(--ink); font-weight:600; font-family:var(--mono); }
+  .refresh-btn { margin-left:auto; font-size:12px; font-weight:600; color:var(--teal); cursor:pointer;
+    background:none; border:1px solid var(--line); border-radius:8px; padding:5px 12px; font-family:var(--font); }
+  .refresh-btn:hover { border-color:var(--teal); }
+  @media (max-width:1100px){ .stat-grid{grid-template-columns:repeat(2,1fr)} }
+
+  @media (max-width:1100px){ .kpi-grid{grid-template-columns:repeat(3,1fr)} .row3,.row-hist{grid-template-columns:1fr} }
+  @media (max-width:720px){ body{grid-template-columns:1fr} .sidebar{display:none} .kpi-grid{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">❄</div>
+      <div><b>SmartCool</b><span id="s_room">Room 101 · Eng. Bldg</span></div>
+    </div>
+    <div class="nav-item active" data-view="dashboard"><span class="ico">▦</span> Dashboard</div>
+    <div class="nav-item" data-view="monitoring"><span class="ico">📈</span> Monitoring</div>
+    <div class="nav-item" data-view="history"><span class="ico">🕘</span> History &amp; Logs</div>
+    <div class="nav-item" data-view="analytics"><span class="ico">📊</span> Analytics</div>
+    <div class="nav-item" data-view="alerts"><span class="ico">🔔</span> Alerts</div>
+    <div class="nav-item" data-view="settings"><span class="ico">⚙</span> Settings</div>
+    <div class="nav-item" data-view="system"><span class="ico">ⓘ</span> System Info</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-foot">Firmware v1.2.3<br>Feed · <span id="s_feed">mock</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>Smart Room Cooling Optimisation</h1>
+        <div class="sub">Environmental &amp; Human Thermal Monitoring</div>
+      </div>
+      <div class="top-right">
+        <span class="src-chip"><span class="sico">📡</span> <b id="src_id">—</b> · <span id="src_loc">—</span></span>
+        <span class="pill" id="onlinePill"><span class="dot"></span> Online</span>
+        <span class="clock" id="clock">--:--:--</span>
+        <div class="avatar">SM</div>
+      </div>
+    </div>
+
+    <section id="view-dashboard" class="view active">
+    <div class="kpi-grid">
+      <div class="card kpi">
+        <div class="khead"><span class="klabel">Room Temp</span><span class="kico bg-info">🌡</span></div>
+        <div class="kval" id="v_room">--<small>°C</small></div>
+        <div class="ksub">Set point: <span id="v_set">24.0</span> °C</div>
+      </div>
+      <div class="card kpi">
+        <div class="khead"><span class="klabel">Humidity</span><span class="kico bg-teal">💧</span></div>
+        <div class="kval" id="v_hum">--<small>%RH</small></div>
+        <div class="ksub">Ideal: 40–60 %RH</div>
+      </div>
+      <div class="card kpi">
+        <div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div>
+        <div class="kval" id="v_body">--<small>°C</small></div>
+        <div class="ksub">Normal: 36.0–37.5 °C</div>
+      </div>
+      <div class="card kpi">
+        <div class="khead"><span class="klabel">Occupancy</span><span class="kico bg-ok">👥</span></div>
+        <div class="kval tall" id="v_occ">--</div>
+        <div class="ksub">Detected: <span id="v_ppl">0</span></div>
+      </div>
+      <div class="card kpi">
+        <div class="khead"><span class="klabel">AC Status</span><span class="kico bg-info">❄</span></div>
+        <div class="kval tall" id="v_ac">--</div>
+        <div class="ksub" id="v_acmode">Mode: Auto</div>
+      </div>
+      <div class="card kpi">
+        <div class="khead"><span class="klabel">Comfort</span><span class="kico" id="cf_ico">🙂</span></div>
+        <div class="kval tall" id="v_comfort">--</div>
+        <div class="ksub">PMV: <span id="v_pmv">0.0</span></div>
+      </div>
+    </div>
+
+    <div class="row3">
+      <div class="card panel">
+        <div class="ptitle"><span class="bg-teal kico" style="width:24px;height:24px;font-size:13px">❄</span> Cooling Recommendation</div>
+        <div class="reco-main" id="reco_main">
+          <div class="rico bg-ok">✓</div>
+          <div class="rtxt"><b id="reco_title">—</b><span id="reco_desc">—</span></div>
+        </div>
+        <div class="reco-list">
+          <div class="reco-item"><span class="rmark" style="background:var(--ok)">✓</span><div><b>Cooling not required</b><span>Conditions comfortable</span></div></div>
+          <div class="reco-item"><span class="rmark" style="background:var(--warn)">!</span><div><b>Cooling recommended</b><span>Temperature rising</span></div></div>
+          <div class="reco-item"><span class="rmark" style="background:var(--hot)">⌁</span><div><b>AC adjustment required</b><span>Adjust to maintain comfort</span></div></div>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <div class="ptitle"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">🎛</span> Manual Override
+          <span class="badge bg-teal" id="modeBadge">AUTO</span>
+        </div>
+        <div class="btn-col">
+          <button class="obtn on"  onclick="cmd('ac_on')"><span class="oico">⏻</span> Turn AC On</button>
+          <button class="obtn off" onclick="cmd('ac_off')"><span class="oico">⏼</span> Turn AC Off</button>
+          <button class="obtn"     onclick="cmd('cool_up')"><span class="oico">▲</span> Increase Cooling</button>
+          <button class="obtn"     onclick="cmd('cool_down')"><span class="oico">▼</span> Decrease Cooling</button>
+          <button class="obtn auto" onclick="cmd('auto')"><span class="oico">↻</span> Return to Auto Mode</button>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <div class="ptitle"><span class="bg-hot kico" style="width:24px;height:24px;font-size:13px">🔔</span> Alerts &amp; Notifications
+          <span class="badge bg-hot" id="alertCount">0</span>
+        </div>
+        <div class="alert-list" id="alertList"></div>
+        <span class="link-more">View all alerts →</span>
+      </div>
+    </div>
+
+    <div class="row-hist">
+      <div class="card panel">
+        <div class="chart-head">
+          <div class="ptitle" style="margin-bottom:0"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">📈</span> History / Logs</div>
+          <div class="tabs" id="rangeTabs">
+            <div class="tab active">1H</div><div class="tab">6H</div><div class="tab">12H</div><div class="tab">24H</div><div class="tab">7D</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      </div>
+      <div class="card panel">
+        <div class="ptitle"><span class="bg-teal kico" style="width:24px;height:24px;font-size:13px">📋</span> Event Log</div>
+        <table>
+          <thead><tr><th>Time</th><th>Event</th><th>Status</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <span>System mode: <b id="f_mode">Auto</b></span>
+      <span>Last updated: <b id="f_updated">—</b></span>
+      <span>Location: <b id="f_loc">Room 101, Engineering Building</b></span>
+      <span>Firmware: <b>v1.2.3</b></span>
+    </div>
+    </section>
+
+    <!-- ===================== HISTORY & LOGS ===================== -->
+    <section id="view-history" class="view">
+      <div class="view-head">History &amp; Logs</div>
+      <div class="row-hist" style="grid-template-columns:1.6fr 1fr">
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">🕘</span> Telemetry History
+            <button class="refresh-btn" onclick="renderHistory()">Refresh</button></div>
+          <div class="big-table-wrap">
+            <table>
+              <thead><tr><th>Time</th><th>Sensor</th><th>Room °C</th><th>Hum %</th><th>Body °C</th><th>Occ</th><th>Comfort</th><th>AC</th></tr></thead>
+              <tbody id="histBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-teal kico" style="width:24px;height:24px;font-size:13px">📋</span> Event Log</div>
+          <div class="big-table-wrap">
+            <table><thead><tr><th>Time</th><th>Event</th><th>Status</th></tr></thead><tbody id="histEvents"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ANALYTICS ===================== -->
+    <section id="view-analytics" class="view">
+      <div class="view-head">Analytics</div>
+      <div class="stat-grid">
+        <div class="card stat"><div class="slabel">Total Readings</div><div class="sval" id="an_count">—</div></div>
+        <div class="card stat"><div class="slabel">Avg Room °C</div><div class="sval" id="an_avgtemp">—</div></div>
+        <div class="card stat"><div class="slabel">Temp Range °C</div><div class="sval" id="an_range">—</div></div>
+        <div class="card stat"><div class="slabel">AC On %</div><div class="sval" id="an_acpct">—</div></div>
+      </div>
+      <div class="row-hist" style="grid-template-columns:1fr 1fr">
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">📊</span> Comfort Distribution
+            <button class="refresh-btn" onclick="renderAnalytics()">Refresh</button></div>
+          <div class="chart-wrap"><canvas id="comfortChart"></canvas></div>
+        </div>
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-teal kico" style="width:24px;height:24px;font-size:13px">⚖️</span> Averages</div>
+          <div id="an_kv"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SYSTEM INFO ===================== -->
+    <section id="view-system" class="view">
+      <div class="view-head">System Info</div>
+      <div class="row-hist" style="grid-template-columns:1fr 1fr">
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-ok kico" style="width:24px;height:24px;font-size:13px">🛰️</span> Connection
+            <button class="refresh-btn" onclick="renderSystem()">Refresh</button></div>
+          <div id="sys_conn"></div>
+        </div>
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">ⓘ</span> Configuration</div>
+          <div id="sys_cfg"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MONITORING ===================== -->
+    <section id="view-monitoring" class="view">
+      <div class="view-head">Live Monitoring</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card kpi"><div class="khead"><span class="klabel">Room Temp</span><span class="kico bg-info">🌡</span></div><div class="kval" id="m_room">—</div><div class="ksub">live</div></div>
+        <div class="card kpi"><div class="khead"><span class="klabel">Humidity</span><span class="kico bg-teal">💧</span></div><div class="kval" id="m_hum">—</div><div class="ksub">live</div></div>
+        <div class="card kpi"><div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div><div class="kval" id="m_body">—</div><div class="ksub">live</div></div>
+        <div class="card kpi"><div class="khead"><span class="klabel">Comfort</span><span class="kico" id="m_cf_ico">🙂</span></div><div class="kval tall" id="m_comfort">—</div><div class="ksub">live</div></div>
+      </div>
+      <div class="card panel">
+        <div class="ptitle"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">📈</span> Live Feed</div>
+        <div class="chart-wrap" style="height:320px"><canvas id="monChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ===================== ALERTS ===================== -->
+    <section id="view-alerts" class="view">
+      <div class="view-head">Alerts &amp; Notifications</div>
+      <div class="card panel">
+        <div class="ptitle"><span class="bg-hot kico" style="width:24px;height:24px;font-size:13px">🔔</span> All Alerts
+          <button class="refresh-btn" onclick="renderAlertsPage()">Refresh</button></div>
+        <div class="alert-list" id="alertsPage"></div>
+      </div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section id="view-settings" class="view">
+      <div class="view-head">Settings</div>
+      <div class="row-hist" style="grid-template-columns:1fr 1fr">
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-info kico" style="width:24px;height:24px;font-size:13px">⚙</span> Comfort Thresholds</div>
+          <div id="set_thresh"></div>
+          <div style="color:var(--muted);font-size:12px;margin-top:10px">Enforced by the backend decision logic (rules R1–R8).</div>
+        </div>
+        <div class="card panel">
+          <div class="ptitle"><span class="bg-teal kico" style="width:24px;height:24px;font-size:13px">🗂</span> Dashboard</div>
+          <div id="set_info"></div>
+          <button class="refresh-btn" style="margin-top:12px" onclick="telemetryBuffer.length=0; renderSettings()">Clear local history buffer</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+/* ============================================================================
+   CONFIG  — flip useMock to false when your backend is running.
+   ========================================================================== */
+const CONFIG = {
+  // Opened from disk (file://) -> mock. Served by the backend (http://) -> live.
+  useMock: location.protocol === 'file:',
+  wsUrl:   (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
+  roomId:  'room-101',
+};
+
+/* ============================================================================
+   DATA CONTRACT  — the backend must send telemetry in EXACTLY this shape:
+   {
+     "timestamp": "2026-08-03T10:24:30Z",
+     "roomId": "room-101", "sensorId": "esp32-a",
+     "roomTemp": 27.3, "humidity": 56, "bodyTemp": 36.6,
+     "occupancy": true, "people": 4,
+     "setpoint": 24.0, "acOn": true, "acMode": "auto",   // "auto" | "manual"
+     "pmv": -0.3, "warning": false, "wifiOk": true
+   }
+   Client -> backend command frame:  { "type": "command", "cmd": "ac_on" }
+     cmd ∈ ac_on | ac_off | cool_up | cool_down | auto
+   ========================================================================== */
+const DEFAULTS = {
+  timestamp: new Date().toISOString(), roomId: CONFIG.roomId, sensorId: 'esp32-a',
+  roomTemp: 27.3, humidity: 56, bodyTemp: 36.6, occupancy: true, people: 4,
+  setpoint: 24.0, acOn: true, acMode: 'auto', pmv: -0.3, warning: false, wifiOk: true,
+};
+
+/* ============================================================================
+   DECISION LOGIC  (report rules R1–R8). Pure function of telemetry.
+   ========================================================================== */
+function classify(t) {
+  if (t.warning)            return { comfort:'Invalid Reading', tone:'hot',  ico:'⚠', title:'Automatic cooling paused', desc:'Sensor reading invalid — awaiting valid data' };
+  if (t.acMode === 'manual')return { comfort:'Manual Override', tone:'info', ico:'🎛', title:'Manual mode active', desc:'Following user command; auto logic paused' };
+  if (!t.occupancy)         return { comfort:'Standby', tone:'info', ico:'🌙', title:'Energy-saving mode', desc:'Room unoccupied — cooling held' };
+  if (t.bodyTemp >= 38.0)   return { comfort:'Alert', tone:'hot', ico:'🌡', title:'Abnormal body temperature', desc:'Recommend manual check; do not rely on auto AC' };
+  if (t.roomTemp >= 27.5 || (t.roomTemp >= 26 && t.humidity > 65))
+                            return { comfort:'Too Warm', tone:'hot', ico:'🥵', title:'AC adjustment required', desc:'Increase cooling within safe limits' };
+  if (t.roomTemp >= 25.0 || t.humidity > 62)
+                            return { comfort:'Warm', tone:'warn', ico:'😅', title:'Cooling recommended', desc:'Temperature rising above comfort range' };
+  return { comfort:'Comfortable', tone:'ok', ico:'🙂', title:'Cooling not required', desc:'Current conditions are within the comfort range' };
+}
+
+/* ============================================================================
+   SOURCES  — both expose the same interface:
+     start(), subscribe(fn), onStatus(fn), command(cmd)
+   ========================================================================== */
+
+// --- Mock: closed-loop thermal model (AC on -> temp falls; off -> rises) ---
+function createMockSource(roomId, intervalMs = 2000) {
+  const t = { ...DEFAULTS, roomId };
+  const subs = new Set(), stat = new Set();
+  const emit = () => { const snap = { ...t }; subs.forEach(f => f(snap)); };
+  const step = () => {
+    t.roomTemp = clamp(t.roomTemp + (t.acOn ? -0.12 : 0.10) + jit(0.06), 21, 31);
+    t.humidity = clamp(t.humidity + jit(0.6), 40, 78);
+    t.bodyTemp = clamp(t.bodyTemp + jit(0.05), 36, 38.4);
+    t.people   = t.occupancy ? t.people : 0;
+    t.pmv      = r1((t.roomTemp - 24) / 3.5);
+    t.timestamp = new Date().toISOString();
+  };
+  return {
+    start() { stat.forEach(f => f(true)); emit(); setInterval(() => { step(); emit(); }, intervalMs); },
+    subscribe(f) { subs.add(f); return () => subs.delete(f); },
+    onStatus(f) { stat.add(f); },
+    command(cmd) { applyCommand(t, cmd); emit(); },
+  };
+}
+
+// --- Real: WebSocket transport (the only networked code) ---
+function createWsSource(url) {
+  const subs = new Set(), stat = new Set();
+  let ws, closed = false;
+  const connect = () => {
+    ws = new WebSocket(url);
+    ws.onopen    = () => stat.forEach(f => f(true));
+    ws.onmessage = (e) => { try { const d = JSON.parse(e.data); subs.forEach(f => f({ ...DEFAULTS, ...d })); } catch {} };
+    ws.onclose   = () => { stat.forEach(f => f(false)); if (!closed) setTimeout(connect, 2000); };
+  };
+  return {
+    start() { connect(); },
+    subscribe(f) { subs.add(f); return () => subs.delete(f); },
+    onStatus(f) { stat.add(f); },
+    command(cmd) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type:'command', cmd })); },
+  };
+}
+
+/* Shared manual-command handling (used by mock; documents backend behaviour) */
+function applyCommand(t, cmd) {
+  switch (cmd) {
+    case 'ac_on':     t.acMode='manual'; t.acOn=true; break;
+    case 'ac_off':    t.acMode='manual'; t.acOn=false; break;
+    case 'cool_up':   t.acMode='manual'; t.acOn=true; t.setpoint=clamp(t.setpoint-0.5,18,28); break;
+    case 'cool_down': t.acMode='manual'; t.setpoint=clamp(t.setpoint+0.5,18,28); break;
+    case 'auto':      t.acMode='auto'; break;
+  }
+}
+
+/* ============================================================================
+   ALERTS / LOG
+   ========================================================================== */
+const historyAlerts = [
+  { ico:'📡', cls:'bg-hot',  t:'Sensor Disconnected',      d:'Room temperature sensor', time:'10:18' },
+  { ico:'📶', cls:'bg-warn', t:'Wi-Fi Lost',               d:'Gateway connection lost',  time:'10:15' },
+  { ico:'❄',  cls:'bg-warn', t:'AC Command Not Confirmed', d:'Increase-cooling failed',  time:'09:45' },
+];
+const eventLog = [
+  { time:'10:20:14', e:'AC turned ON',            s:'ok' },
+  { time:'10:20:04', e:'Set point → 24.0 °C',     s:'ok' },
+  { time:'10:18:32', e:'Sensor disconnected',     s:'warn' },
+  { time:'10:15:07', e:'Wi-Fi lost',              s:'warn' },
+  { time:'10:10:45', e:'Manual: Increase cooling',s:'ok' },
+];
+
+// Live alerts derived from the current telemetry, shown above the history.
+function liveAlerts(t) {
+  const out = [];
+  if (t.warning)         out.push({ ico:'⚠', cls:'bg-hot',  t:'Invalid Sensor Reading', d:'Automatic cooling paused', time:hhmm() });
+  if (!t.wifiOk)         out.push({ ico:'📶', cls:'bg-warn', t:'Wi-Fi Lost',            d:'Device offline',            time:hhmm() });
+  if (t.bodyTemp >= 38)  out.push({ ico:'🌡', cls:'bg-hot',  t:'High Body Temperature', d:`Reading: ${t.bodyTemp.toFixed(1)} °C`, time:hhmm() });
+  return out;
+}
+
+/* ============================================================================
+   RENDER
+   ========================================================================== */
+let connected = true, latest = null;
+
+function render(t) {
+  latest = t;
+  const c = classify(t);
+
+  set('v_room', t.roomTemp.toFixed(1) + '<small>°C</small>');
+  set('v_set',  t.setpoint.toFixed(1));
+  set('v_hum',  Math.round(t.humidity) + '<small>%RH</small>');
+  set('v_body', t.bodyTemp.toFixed(1) + '<small>°C</small>');
+  set('v_occ',  t.occupancy ? 'Occupied' : 'Empty');
+  set('v_ppl',  t.people);
+  set('v_ac',   t.acOn ? 'ON' : 'OFF');
+  set('v_acmode', 'Mode: ' + (t.acMode === 'manual' ? 'Manual' : 'Auto · Cool'));
+  set('v_pmv',  t.pmv.toFixed(1));
+
+  const comfortEl = document.getElementById('v_comfort');
+  comfortEl.textContent = c.comfort;
+  comfortEl.className = 'kval tall state-' + c.tone;
+  document.getElementById('cf_ico').textContent = c.ico;
+
+  set('reco_title', c.title);
+  set('reco_desc', c.desc);
+  const rico = document.querySelector('#reco_main .rico');
+  rico.className = 'rico bg-' + c.tone;
+  rico.textContent = c.comfort === 'Comfortable' ? '✓' : (c.comfort === 'Too Warm' ? '⌁' : '!');
+
+  const online = connected && t.wifiOk;
+  const pill = document.getElementById('onlinePill');
+  pill.className = 'pill' + (online ? '' : ' off');
+  pill.innerHTML = '<span class="dot"></span> ' + (online ? 'Online' : 'Offline');
+
+  document.getElementById('modeBadge').textContent = t.acMode.toUpperCase();
+  document.getElementById('modeBadge').className = 'badge ' + (t.acMode === 'manual' ? 'bg-warn' : 'bg-teal');
+  set('f_mode', t.acMode === 'manual' ? 'Manual' : 'Auto');
+  set('f_updated', new Date(t.timestamp).toLocaleTimeString('en-GB'));
+  set('f_loc', t.roomId + ', Engineering Building');
+  set('s_room', t.roomId + ' · Eng. Bldg');
+  set('src_id', t.sensorId || '—');
+  set('src_loc', t.roomId || '—');
+
+  renderAlerts(t);
+  pushChart(t);
+
+  telemetryBuffer.push({ ts:t.timestamp, sensor:t.sensorId, room:t.roomTemp, hum:t.humidity,
+    body:t.bodyTemp, occ:t.occupancy, comfort:c.comfort, ac:t.acOn });
+  if (telemetryBuffer.length > 500) telemetryBuffer.shift();
+
+  if (document.getElementById('view-monitoring').classList.contains('active')) updateMonitoring(t, c);
+}
+
+function renderAlerts(t) {
+  const all = [ ...liveAlerts(t), ...historyAlerts ];
+  document.getElementById('alertList').innerHTML = all.map(a => `
+    <div class="alert-item">
+      <div class="aico ${a.cls}">${a.ico}</div>
+      <div class="abody"><b>${a.t}</b><span>${a.d}</span></div>
+      <div class="atime">${a.time}</div>
+    </div>`).join('');
+  document.getElementById('alertCount').textContent = all.length;
+}
+
+function renderLog() {
+  const tag = { ok:'bg-ok', warn:'bg-warn', hot:'bg-hot' };
+  const word = { ok:'Success', warn:'Warning', hot:'Fault' };
+  document.getElementById('logBody').innerHTML = eventLog.slice(0,7).map(r => `
+    <tr><td>${r.time}</td><td>${r.e}</td>
+    <td><span class="tag ${tag[r.s]}">${word[r.s]}</span></td></tr>`).join('');
+}
+
+/* ============================================================================
+   COMMANDS  — routed through the active source (mock mutates; real publishes)
+   ========================================================================== */
+let source = null;
+function cmd(action) {
+  if (!source) return;
+  source.command(action);
+  eventLog.unshift({ time: nowStr(), e: cmdLabel(action), s:'ok' });
+  renderLog();
+}
+function cmdLabel(a) {
+  return ({ ac_on:'Manual: AC ON', ac_off:'Manual: AC OFF', cool_up:'Manual: Increase cooling',
+    cool_down:'Manual: Decrease cooling', auto:'Returned to Auto mode' })[a] || a;
+}
+
+/* ============================================================================
+   CHART
+   ========================================================================== */
+let chart; const MAXPTS = 30;
+function initChart() {
+  const mk = (label, color) => ({ label, data:[], borderColor:color, backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:.35 });
+  chart = new Chart(document.getElementById('chart'), {
+    type:'line',
+    data:{ labels:[], datasets:[ mk('Room °C','#2563eb'), mk('Humidity %','#0d9488'), mk('Body °C','#d97706'),
+      { label:'Set °C', data:[], borderColor:'#8496a8', borderDash:[5,4], borderWidth:1.5, pointRadius:0 } ]},
+    options:{ responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, boxHeight:10, font:{size:11}, usePointStyle:true } } },
+      scales:{ x:{ grid:{display:false}, ticks:{ maxTicksLimit:6, font:{size:10}, color:'#8496a8' } },
+               y:{ grid:{ color:'#eef2f6' }, ticks:{ font:{size:10}, color:'#8496a8' } } } }
+  });
+}
+function pushChart(t) {
+  const l = chart.data.labels;
+  l.push(new Date(t.timestamp).toLocaleTimeString('en-GB'));
+  chart.data.datasets[0].data.push(t.roomTemp);
+  chart.data.datasets[1].data.push(t.humidity);
+  chart.data.datasets[2].data.push(t.bodyTemp);
+  chart.data.datasets[3].data.push(t.setpoint);
+  if (l.length > MAXPTS) { l.shift(); chart.data.datasets.forEach(d => d.data.shift()); }
+  chart.update();
+}
+
+/* ============================================================================
+   HELPERS
+   ========================================================================== */
+function set(id, html){ const e=document.getElementById(id); if(e) e.innerHTML = html; }
+function jit(m){ return (Math.random()*2-1)*m; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function r1(v){ return Math.round(v*10)/10; }
+function nowStr(){ return new Date().toLocaleTimeString('en-GB'); }
+function hhmm(){ return new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function tickClock(){ set('clock', nowStr()); }
+
+/* ============================================================================
+   TAB VIEWS  (History & Logs, Analytics, System Info)
+   ========================================================================== */
+const telemetryBuffer = [];
+
+async function apiGet(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error('http ' + r.status);
+  return r.json();
+}
+
+function switchView(view, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  if (view === 'history')    renderHistory();
+  if (view === 'analytics')  renderAnalytics();
+  if (view === 'system')     renderSystem();
+  if (view === 'monitoring') renderMonitoring();
+  if (view === 'alerts')     renderAlertsPage();
+  if (view === 'settings')   renderSettings();
+}
+
+function shortTime(iso) { try { return new Date(iso).toLocaleTimeString('en-GB'); } catch { return iso || '—'; } }
+function num(v) { return (v == null || v === '') ? '—' : Number(v).toFixed(1); }
+function fmtNum(v) { return (v == null || isNaN(v)) ? '—' : Number(v).toFixed(1); }
+function kvRow(k, v) { return `<div class="kv"><span>${k}</span><b>${v}</b></div>`; }
+function avg(a) { a = a.filter(v => typeof v === 'number'); return a.length ? Math.round(10*a.reduce((x,y)=>x+y,0)/a.length)/10 : null; }
+
+function statsFromBuffer() {
+  const b = telemetryBuffer;
+  if (!b.length) return { count: 0, comfort_distribution: [] };
+  const temps = b.map(r => r.room), acOn = b.filter(r => r.ac).length, dist = {};
+  b.forEach(r => { dist[r.comfort] = (dist[r.comfort] || 0) + 1; });
+  return {
+    count: b.length, avg_temp: avg(temps), min_temp: Math.min(...temps), max_temp: Math.max(...temps),
+    avg_humidity: avg(b.map(r => r.hum)), avg_body: avg(b.map(r => r.body)),
+    ac_on_pct: Math.round(1000*acOn/b.length)/10,
+    comfort_distribution: Object.entries(dist).map(([comfort, count]) => ({ comfort, count })),
+  };
+}
+
+async function renderHistory() {
+  let rows;
+  try {
+    rows = (await apiGet('/api/telemetry?limit=200')).map(r => ({
+      ts:r.ts, sensor:r.sensor_id, room:r.room_temp, hum:r.humidity, body:r.body_temp,
+      occ:r.occupancy, comfort:r.comfort, ac:r.ac_on }));
+  } catch { rows = [...telemetryBuffer].reverse(); }
+  document.getElementById('histBody').innerHTML = rows.map(r => `<tr>
+    <td>${shortTime(r.ts)}</td><td>${r.sensor || '—'}</td>
+    <td>${num(r.room)}</td><td>${num(r.hum)}</td><td>${num(r.body)}</td>
+    <td>${r.occ ? 'Yes' : 'No'}</td><td>${r.comfort || '—'}</td>
+    <td>${r.ac ? 'ON' : 'OFF'}</td></tr>`).join('') || '<tr><td colspan="8" style="color:var(--muted)">No data yet</td></tr>';
+
+  let ev;
+  try { ev = (await apiGet('/api/events?limit=100')).map(e => ({ time:e.ts, e:e.event, s:e.status })); }
+  catch { ev = eventLog; }
+  const tag = { ok:'bg-ok', warn:'bg-warn', hot:'bg-hot' }, word = { ok:'Success', warn:'Warning', hot:'Fault' };
+  document.getElementById('histEvents').innerHTML = ev.map(r => `<tr>
+    <td>${r.time}</td><td>${r.e}</td>
+    <td><span class="tag ${tag[r.s] || 'bg-ok'}">${word[r.s] || r.s}</span></td></tr>`).join('');
+}
+
+let comfortChart;
+async function renderAnalytics() {
+  let s;
+  try { s = await apiGet('/api/stats'); } catch { s = statsFromBuffer(); }
+  set('an_count', s.count ?? 0);
+  set('an_avgtemp', fmtNum(s.avg_temp));
+  set('an_range', fmtNum(s.min_temp) + '–' + fmtNum(s.max_temp));
+  set('an_acpct', (s.ac_on_pct ?? 0) + '%');
+  document.getElementById('an_kv').innerHTML =
+    kvRow('Avg humidity', fmtNum(s.avg_humidity) + ' %') +
+    kvRow('Avg body temp', fmtNum(s.avg_body) + ' °C') +
+    kvRow('AC on', (s.ac_on_pct ?? 0) + '%') +
+    kvRow('Total readings', s.count ?? 0);
+  drawComfortChart(s.comfort_distribution || []);
+}
+
+function drawComfortChart(dist) {
+  const labels = dist.map(d => d.comfort), data = dist.map(d => d.count);
+  const colors = { Comfortable:'#16a34a', Warm:'#d97706', 'Too Warm':'#dc2626', Standby:'#2563eb',
+    'Manual Override':'#8496a8', 'Invalid Reading':'#b91c1c', Alert:'#dc2626' };
+  const bg = labels.map(l => colors[l] || '#8496a8');
+  if (comfortChart) comfortChart.destroy();
+  comfortChart = new Chart(document.getElementById('comfortChart'), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:bg, borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'right', labels:{ font:{size:11}, boxWidth:12, usePointStyle:true } } } }
+  });
+}
+
+async function renderSystem() {
+  let health = {}, s = {};
+  try { health = await apiGet('/health'); } catch {}
+  try { s = await apiGet('/api/stats'); } catch { s = statsFromBuffer(); }
+  const t = latest || {};
+  document.getElementById('sys_conn').innerHTML =
+    kvRow('Dashboard feed', CONFIG.useMock ? 'mock (offline)' : 'live (backend)') +
+    kvRow('MQTT connected', health.mqtt_connected ? 'yes' : (CONFIG.useMock ? 'n/a' : 'no')) +
+    kvRow('Device online', (t.wifiOk) ? 'yes' : 'no') +
+    kvRow('Last update', t.timestamp ? shortTime(t.timestamp) : '—');
+  document.getElementById('sys_cfg').innerHTML =
+    kvRow('Room ID', t.roomId || CONFIG.roomId) +
+    kvRow('Sensor ID', t.sensorId || '—') +
+    kvRow('Firmware', 'v1.2.3') +
+    kvRow('Logged readings', s.count ?? 0);
+}
+
+let monChart;
+function initMonChart() {
+  const mk = (label, color) => ({ label, data:[], borderColor:color, backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:.35 });
+  monChart = new Chart(document.getElementById('monChart'), {
+    type:'line',
+    data:{ labels:[], datasets:[ mk('Room °C','#2563eb'), mk('Humidity %','#0d9488'), mk('Body °C','#d97706'),
+      { label:'Set °C', data:[], borderColor:'#8496a8', borderDash:[5,4], borderWidth:1.5, pointRadius:0 } ]},
+    options:{ responsive:true, maintainAspectRatio:false, animation:false, interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, boxHeight:10, font:{size:11}, usePointStyle:true } } },
+      scales:{ x:{ grid:{display:false}, ticks:{ maxTicksLimit:6, font:{size:10}, color:'#8496a8' } },
+               y:{ grid:{ color:'#eef2f6' }, ticks:{ font:{size:10}, color:'#8496a8' } } } }
+  });
+}
+function updateMonitoring(t, c) {
+  set('m_room', num(t.roomTemp) + ' °C');
+  set('m_hum', Math.round(t.humidity) + ' %');
+  set('m_body', num(t.bodyTemp) + ' °C');
+  const el = document.getElementById('m_comfort');
+  el.textContent = c.comfort; el.className = 'kval tall state-' + c.tone;
+  document.getElementById('m_cf_ico').textContent = c.ico;
+  if (!monChart) return;
+  const l = monChart.data.labels;
+  l.push(shortTime(t.timestamp));
+  monChart.data.datasets[0].data.push(t.roomTemp);
+  monChart.data.datasets[1].data.push(t.humidity);
+  monChart.data.datasets[2].data.push(t.bodyTemp);
+  monChart.data.datasets[3].data.push(t.setpoint);
+  if (l.length > 40) { l.shift(); monChart.data.datasets.forEach(d => d.data.shift()); }
+  monChart.update();
+}
+function renderMonitoring() {
+  if (!monChart) initMonChart();
+  if (latest) updateMonitoring(latest, classify(latest));
+}
+
+async function renderAlertsPage() {
+  let items = latest ? liveAlerts(latest) : [];
+  items = items.concat(historyAlerts);
+  try {
+    const ev = await apiGet('/api/events?limit=100');
+    ev.filter(e => e.status !== 'ok').forEach(e =>
+      items.push({ ico:'⚠', cls: e.status === 'hot' ? 'bg-hot' : 'bg-warn', t:e.event, d:'logged event', time:e.ts }));
+  } catch {}
+  document.getElementById('alertsPage').innerHTML = items.map(a => `
+    <div class="alert-item"><div class="aico ${a.cls}">${a.ico}</div>
+      <div class="abody"><b>${a.t}</b><span>${a.d}</span></div>
+      <div class="atime">${a.time}</div></div>`).join('')
+    || '<div style="color:var(--muted);font-size:13px;padding:10px">No alerts.</div>';
+}
+
+function renderSettings() {
+  document.getElementById('set_thresh').innerHTML =
+    kvRow('Warm at', 'room ≥ 25.0 °C or humidity > 62%') +
+    kvRow('Too Warm at', 'room ≥ 27.5 °C') +
+    kvRow('Abnormal body temp', '≥ 38.0 °C') +
+    kvRow('Comfort setpoint', '24.0 °C');
+  const t = latest || {};
+  document.getElementById('set_info').innerHTML =
+    kvRow('Feed', CONFIG.useMock ? 'mock' : 'live') +
+    kvRow('Room ID', t.roomId || CONFIG.roomId) +
+    kvRow('Buffered readings', telemetryBuffer.length) +
+    kvRow('Update interval', '2 s');
+}
+
+/* ============================================================================
+   BOOT
+   ========================================================================== */
+initChart();
+renderLog();
+
+source = CONFIG.useMock ? createMockSource(CONFIG.roomId) : createWsSource(CONFIG.wsUrl);
+source.onStatus(ok => { connected = ok; if (latest) render(latest); });
+source.subscribe(render);
+source.start();
+
+document.getElementById('s_feed').textContent = CONFIG.useMock ? 'mock' : 'live';
+setInterval(tickClock, 1000);
+tickClock();
+
+document.querySelectorAll('.nav-item[data-view]').forEach(el =>
+  el.addEventListener('click', () => switchView(el.dataset.view, el)));
+</script>
+</body>
+</html>

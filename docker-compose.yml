@@ -1,0 +1,41 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smartcool-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  backend:
+    build: .
+    image: smartcool:latest
+    container_name: smartcool-backend
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: mosquitto        # reach the broker by its service name
+      MQTT_PORT: "1883"
+      ROOM_ID: room-101
+      DB_PATH: /data/smartcool.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - smartcool-data:/data      # persist the SQLite log across restarts
+    restart: unless-stopped
+
+  sensor:
+    image: smartcool:latest       # reuses the image built by "backend"
+    container_name: smartcool-sensor
+    depends_on:
+      - backend
+    environment:
+      MQTT_HOST: mosquitto
+      ROOM_ID: room-101
+      SCENARIO: normal            # normal | warm | toowarm | humid | empty | faulty | offline | abnormal
+    command: ["python", "sim/virtual_sensor.py"]
+    restart: unless-stopped
+
+volumes:
+  smartcool-data:
