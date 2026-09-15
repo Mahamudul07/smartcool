@@ -193,11 +193,11 @@
         <div class="kval" id="v_hum">--<small>%RH</small></div>
         <div class="ksub">Ideal: 40–60 %RH</div>
       </div>
-      <div class="card kpi">
+      <!-- <div class="card kpi">
         <div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div>
         <div class="kval" id="v_body">--<small>°C</small></div>
         <div class="ksub">Normal: 36.0–37.5 °C</div>
-      </div>
+      </div> -->
       <div class="card kpi">
         <div class="khead"><span class="klabel">Occupancy</span><span class="kico bg-ok">👥</span></div>
         <div class="kval tall" id="v_occ">--</div>
@@ -345,7 +345,7 @@
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card kpi"><div class="khead"><span class="klabel">Room Temp</span><span class="kico bg-info">🌡</span></div><div class="kval" id="m_room">—</div><div class="ksub">live</div></div>
         <div class="card kpi"><div class="khead"><span class="klabel">Humidity</span><span class="kico bg-teal">💧</span></div><div class="kval" id="m_hum">—</div><div class="ksub">live</div></div>
-        <div class="card kpi"><div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div><div class="kval" id="m_body">—</div><div class="ksub">live</div></div>
+        <!-- <div class="card kpi"><div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div><div class="kval" id="m_body">—</div><div class="ksub">live</div></div> -->
         <div class="card kpi"><div class="khead"><span class="klabel">Comfort</span><span class="kico" id="m_cf_ico">🙂</span></div><div class="kval tall" id="m_comfort">—</div><div class="ksub">live</div></div>
       </div>
       <div class="card panel">
@@ -519,7 +519,7 @@ function render(t) {
   set('v_room', t.roomTemp.toFixed(1) + '<small>°C</small>');
   set('v_set',  t.setpoint.toFixed(1));
   set('v_hum',  Math.round(t.humidity) + '<small>%RH</small>');
-  set('v_body', t.bodyTemp.toFixed(1) + '<small>°C</small>');
+  // set('v_body', t.bodyTemp.toFixed(1) + '<small>°C</small>');
   set('v_occ',  t.occupancy ? 'Occupied' : 'Empty');
   set('v_ppl',  t.people);
   set('v_ac',   t.acOn ? 'ON' : 'OFF');
@@ -603,7 +603,7 @@ function initChart() {
   const mk = (label, color) => ({ label, data:[], borderColor:color, backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:.35 });
   chart = new Chart(document.getElementById('chart'), {
     type:'line',
-    data:{ labels:[], datasets:[ mk('Room °C','#2563eb'), mk('Humidity %','#0d9488'), mk('Body °C','#d97706'),
+    data:{ labels:[], datasets:[ mk('Room °C','#2563eb'), mk('Humidity %','#0d9488'),
       { label:'Set °C', data:[], borderColor:'#8496a8', borderDash:[5,4], borderWidth:1.5, pointRadius:0 } ]},
     options:{ responsive:true, maintainAspectRatio:false, animation:false,
       interaction:{ mode:'index', intersect:false },
@@ -617,7 +617,7 @@ function pushChart(t) {
   l.push(new Date(t.timestamp).toLocaleTimeString('en-GB'));
   chart.data.datasets[0].data.push(t.roomTemp);
   chart.data.datasets[1].data.push(t.humidity);
-  chart.data.datasets[2].data.push(t.bodyTemp);
+  // chart.data.datasets[2].data.push(t.bodyTemp);
   chart.data.datasets[3].data.push(t.setpoint);
   if (l.length > MAXPTS) { l.shift(); chart.data.datasets.forEach(d => d.data.shift()); }
   chart.update();
