@@ -56,7 +56,7 @@
   .avatar { width:34px; height:34px; border-radius:50%; background:var(--navy-2); color:#fff;
     display:grid; place-items:center; font-size:13px; font-weight:600; }
 
-  .kpi-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-bottom:16px; }
+  .kpi-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:16px; }
   .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
   .kpi { padding:16px 16px 15px; }
   .kpi .khead { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
@@ -193,11 +193,6 @@
         <div class="kval" id="v_hum">--<small>%RH</small></div>
         <div class="ksub">Ideal: 40–60 %RH</div>
       </div>
-      <!-- <div class="card kpi">
-        <div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div>
-        <div class="kval" id="v_body">--<small>°C</small></div>
-        <div class="ksub">Normal: 36.0–37.5 °C</div>
-      </div> -->
       <div class="card kpi">
         <div class="khead"><span class="klabel">Occupancy</span><span class="kico bg-ok">👥</span></div>
         <div class="kval tall" id="v_occ">--</div>
@@ -287,7 +282,7 @@
             <button class="refresh-btn" onclick="renderHistory()">Refresh</button></div>
           <div class="big-table-wrap">
             <table>
-              <thead><tr><th>Time</th><th>Sensor</th><th>Room °C</th><th>Hum %</th><th>Body °C</th><th>Occ</th><th>Comfort</th><th>AC</th></tr></thead>
+              <thead><tr><th>Time</th><th>Sensor</th><th>Room °C</th><th>Hum %</th><th>Occ</th><th>Comfort</th><th>AC</th></tr></thead>
               <tbody id="histBody"></tbody>
             </table>
           </div>
@@ -303,7 +298,15 @@
 
     <!-- ===================== ANALYTICS ===================== -->
     <section id="view-analytics" class="view">
-      <div class="view-head">Analytics</div>
+      <div class="chart-head" style="margin-bottom:14px">
+        <div class="view-head" style="margin:0">Analytics <span id="an_label" style="font-size:12px;font-weight:600;color:var(--muted)">· last 7 days</span></div>
+        <div class="tabs" id="anRange">
+          <div class="tab" data-days="3">3D</div>
+          <div class="tab active" data-days="7">7D</div>
+          <div class="tab" data-days="15">15D</div>
+          <div class="tab" data-days="30">30D</div>
+        </div>
+      </div>
       <div class="stat-grid">
         <div class="card stat"><div class="slabel">Total Readings</div><div class="sval" id="an_count">—</div></div>
         <div class="card stat"><div class="slabel">Avg Room °C</div><div class="sval" id="an_avgtemp">—</div></div>
@@ -342,10 +345,9 @@
     <!-- ===================== MONITORING ===================== -->
     <section id="view-monitoring" class="view">
       <div class="view-head">Live Monitoring</div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="card kpi"><div class="khead"><span class="klabel">Room Temp</span><span class="kico bg-info">🌡</span></div><div class="kval" id="m_room">—</div><div class="ksub">live</div></div>
         <div class="card kpi"><div class="khead"><span class="klabel">Humidity</span><span class="kico bg-teal">💧</span></div><div class="kval" id="m_hum">—</div><div class="ksub">live</div></div>
-        <!-- <div class="card kpi"><div class="khead"><span class="klabel">Body Temp</span><span class="kico bg-warn">🧍</span></div><div class="kval" id="m_body">—</div><div class="ksub">live</div></div> -->
         <div class="card kpi"><div class="khead"><span class="klabel">Comfort</span><span class="kico" id="m_cf_ico">🙂</span></div><div class="kval tall" id="m_comfort">—</div><div class="ksub">live</div></div>
       </div>
       <div class="card panel">
@@ -398,7 +400,7 @@ const CONFIG = {
    {
      "timestamp": "2026-08-03T10:24:30Z",
      "roomId": "room-101", "sensorId": "esp32-a",
-     "roomTemp": 27.3, "humidity": 56, "bodyTemp": 36.6,
+     "roomTemp": 27.3, "humidity": 56,
      "occupancy": true, "people": 4,
      "setpoint": 24.0, "acOn": true, "acMode": "auto",   // "auto" | "manual"
      "pmv": -0.3, "warning": false, "wifiOk": true
@@ -408,7 +410,7 @@ const CONFIG = {
    ========================================================================== */
 const DEFAULTS = {
   timestamp: new Date().toISOString(), roomId: CONFIG.roomId, sensorId: 'esp32-a',
-  roomTemp: 27.3, humidity: 56, bodyTemp: 36.6, occupancy: true, people: 4,
+  roomTemp: 27.3, humidity: 56, occupancy: true, people: 4,
   setpoint: 24.0, acOn: true, acMode: 'auto', pmv: -0.3, warning: false, wifiOk: true,
 };
 
@@ -419,7 +421,6 @@ function classify(t) {
   if (t.warning)            return { comfort:'Invalid Reading', tone:'hot',  ico:'⚠', title:'Automatic cooling paused', desc:'Sensor reading invalid — awaiting valid data' };
   if (t.acMode === 'manual')return { comfort:'Manual Override', tone:'info', ico:'🎛', title:'Manual mode active', desc:'Following user command; auto logic paused' };
   if (!t.occupancy)         return { comfort:'Standby', tone:'info', ico:'🌙', title:'Energy-saving mode', desc:'Room unoccupied — cooling held' };
-  if (t.bodyTemp >= 38.0)   return { comfort:'Alert', tone:'hot', ico:'🌡', title:'Abnormal body temperature', desc:'Recommend manual check; do not rely on auto AC' };
   if (t.roomTemp >= 27.5 || (t.roomTemp >= 26 && t.humidity > 65))
                             return { comfort:'Too Warm', tone:'hot', ico:'🥵', title:'AC adjustment required', desc:'Increase cooling within safe limits' };
   if (t.roomTemp >= 25.0 || t.humidity > 62)
@@ -440,7 +441,6 @@ function createMockSource(roomId, intervalMs = 2000) {
   const step = () => {
     t.roomTemp = clamp(t.roomTemp + (t.acOn ? -0.12 : 0.10) + jit(0.06), 21, 31);
     t.humidity = clamp(t.humidity + jit(0.6), 40, 78);
-    t.bodyTemp = clamp(t.bodyTemp + jit(0.05), 36, 38.4);
     t.people   = t.occupancy ? t.people : 0;
     t.pmv      = r1((t.roomTemp - 24) / 3.5);
     t.timestamp = new Date().toISOString();
@@ -503,7 +503,6 @@ function liveAlerts(t) {
   const out = [];
   if (t.warning)         out.push({ ico:'⚠', cls:'bg-hot',  t:'Invalid Sensor Reading', d:'Automatic cooling paused', time:hhmm() });
   if (!t.wifiOk)         out.push({ ico:'📶', cls:'bg-warn', t:'Wi-Fi Lost',            d:'Device offline',            time:hhmm() });
-  if (t.bodyTemp >= 38)  out.push({ ico:'🌡', cls:'bg-hot',  t:'High Body Temperature', d:`Reading: ${t.bodyTemp.toFixed(1)} °C`, time:hhmm() });
   return out;
 }
 
@@ -519,7 +518,6 @@ function render(t) {
   set('v_room', t.roomTemp.toFixed(1) + '<small>°C</small>');
   set('v_set',  t.setpoint.toFixed(1));
   set('v_hum',  Math.round(t.humidity) + '<small>%RH</small>');
-  // set('v_body', t.bodyTemp.toFixed(1) + '<small>°C</small>');
   set('v_occ',  t.occupancy ? 'Occupied' : 'Empty');
   set('v_ppl',  t.people);
   set('v_ac',   t.acOn ? 'ON' : 'OFF');
@@ -555,7 +553,7 @@ function render(t) {
   pushChart(t);
 
   telemetryBuffer.push({ ts:t.timestamp, sensor:t.sensorId, room:t.roomTemp, hum:t.humidity,
-    body:t.bodyTemp, occ:t.occupancy, comfort:c.comfort, ac:t.acOn });
+    occ:t.occupancy, comfort:c.comfort, ac:t.acOn });
   if (telemetryBuffer.length > 500) telemetryBuffer.shift();
 
   if (document.getElementById('view-monitoring').classList.contains('active')) updateMonitoring(t, c);
@@ -617,8 +615,7 @@ function pushChart(t) {
   l.push(new Date(t.timestamp).toLocaleTimeString('en-GB'));
   chart.data.datasets[0].data.push(t.roomTemp);
   chart.data.datasets[1].data.push(t.humidity);
-  // chart.data.datasets[2].data.push(t.bodyTemp);
-  chart.data.datasets[3].data.push(t.setpoint);
+  chart.data.datasets[2].data.push(t.setpoint);
   if (l.length > MAXPTS) { l.shift(); chart.data.datasets.forEach(d => d.data.shift()); }
   chart.update();
 }
@@ -664,14 +661,17 @@ function fmtNum(v) { return (v == null || isNaN(v)) ? '—' : Number(v).toFixed(
 function kvRow(k, v) { return `<div class="kv"><span>${k}</span><b>${v}</b></div>`; }
 function avg(a) { a = a.filter(v => typeof v === 'number'); return a.length ? Math.round(10*a.reduce((x,y)=>x+y,0)/a.length)/10 : null; }
 
-function statsFromBuffer() {
-  const b = telemetryBuffer;
+let analyticsDays = 7;
+
+function statsFromBuffer(days) {
+  const cutoff = days ? Date.now() - days * 86400000 : 0;
+  const b = telemetryBuffer.filter(r => new Date(r.ts).getTime() >= cutoff);
   if (!b.length) return { count: 0, comfort_distribution: [] };
   const temps = b.map(r => r.room), acOn = b.filter(r => r.ac).length, dist = {};
   b.forEach(r => { dist[r.comfort] = (dist[r.comfort] || 0) + 1; });
   return {
     count: b.length, avg_temp: avg(temps), min_temp: Math.min(...temps), max_temp: Math.max(...temps),
-    avg_humidity: avg(b.map(r => r.hum)), avg_body: avg(b.map(r => r.body)),
+    avg_humidity: avg(b.map(r => r.hum)),
     ac_on_pct: Math.round(1000*acOn/b.length)/10,
     comfort_distribution: Object.entries(dist).map(([comfort, count]) => ({ comfort, count })),
   };
@@ -681,14 +681,14 @@ async function renderHistory() {
   let rows;
   try {
     rows = (await apiGet('/api/telemetry?limit=200')).map(r => ({
-      ts:r.ts, sensor:r.sensor_id, room:r.room_temp, hum:r.humidity, body:r.body_temp,
+      ts:r.ts, sensor:r.sensor_id, room:r.room_temp, hum:r.humidity,
       occ:r.occupancy, comfort:r.comfort, ac:r.ac_on }));
   } catch { rows = [...telemetryBuffer].reverse(); }
   document.getElementById('histBody').innerHTML = rows.map(r => `<tr>
     <td>${shortTime(r.ts)}</td><td>${r.sensor || '—'}</td>
-    <td>${num(r.room)}</td><td>${num(r.hum)}</td><td>${num(r.body)}</td>
+    <td>${num(r.room)}</td><td>${num(r.hum)}</td>
     <td>${r.occ ? 'Yes' : 'No'}</td><td>${r.comfort || '—'}</td>
-    <td>${r.ac ? 'ON' : 'OFF'}</td></tr>`).join('') || '<tr><td colspan="8" style="color:var(--muted)">No data yet</td></tr>';
+    <td>${r.ac ? 'ON' : 'OFF'}</td></tr>`).join('') || '<tr><td colspan="7" style="color:var(--muted)">No data yet</td></tr>';
 
   let ev;
   try { ev = (await apiGet('/api/events?limit=100')).map(e => ({ time:e.ts, e:e.event, s:e.status })); }
@@ -702,14 +702,14 @@ async function renderHistory() {
 let comfortChart;
 async function renderAnalytics() {
   let s;
-  try { s = await apiGet('/api/stats'); } catch { s = statsFromBuffer(); }
+  try { s = await apiGet('/api/stats?days=' + analyticsDays); } catch { s = statsFromBuffer(analyticsDays); }
+  set('an_label', '· last ' + analyticsDays + ' days');
   set('an_count', s.count ?? 0);
   set('an_avgtemp', fmtNum(s.avg_temp));
   set('an_range', fmtNum(s.min_temp) + '–' + fmtNum(s.max_temp));
   set('an_acpct', (s.ac_on_pct ?? 0) + '%');
   document.getElementById('an_kv').innerHTML =
     kvRow('Avg humidity', fmtNum(s.avg_humidity) + ' %') +
-    kvRow('Avg body temp', fmtNum(s.avg_body) + ' °C') +
     kvRow('AC on', (s.ac_on_pct ?? 0) + '%') +
     kvRow('Total readings', s.count ?? 0);
   drawComfortChart(s.comfort_distribution || []);
@@ -751,7 +751,7 @@ function initMonChart() {
   const mk = (label, color) => ({ label, data:[], borderColor:color, backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:.35 });
   monChart = new Chart(document.getElementById('monChart'), {
     type:'line',
-    data:{ labels:[], datasets:[ mk('Room °C','#2563eb'), mk('Humidity %','#0d9488'), mk('Body °C','#d97706'),
+    data:{ labels:[], datasets:[ mk('Room °C','#2563eb'), mk('Humidity %','#0d9488'),
       { label:'Set °C', data:[], borderColor:'#8496a8', borderDash:[5,4], borderWidth:1.5, pointRadius:0 } ]},
     options:{ responsive:true, maintainAspectRatio:false, animation:false, interaction:{ mode:'index', intersect:false },
       plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, boxHeight:10, font:{size:11}, usePointStyle:true } } },
@@ -762,7 +762,6 @@ function initMonChart() {
 function updateMonitoring(t, c) {
   set('m_room', num(t.roomTemp) + ' °C');
   set('m_hum', Math.round(t.humidity) + ' %');
-  set('m_body', num(t.bodyTemp) + ' °C');
   const el = document.getElementById('m_comfort');
   el.textContent = c.comfort; el.className = 'kval tall state-' + c.tone;
   document.getElementById('m_cf_ico').textContent = c.ico;
@@ -771,8 +770,7 @@ function updateMonitoring(t, c) {
   l.push(shortTime(t.timestamp));
   monChart.data.datasets[0].data.push(t.roomTemp);
   monChart.data.datasets[1].data.push(t.humidity);
-  monChart.data.datasets[2].data.push(t.bodyTemp);
-  monChart.data.datasets[3].data.push(t.setpoint);
+  monChart.data.datasets[2].data.push(t.setpoint);
   if (l.length > 40) { l.shift(); monChart.data.datasets.forEach(d => d.data.shift()); }
   monChart.update();
 }
@@ -824,6 +822,13 @@ source.start();
 document.getElementById('s_feed').textContent = CONFIG.useMock ? 'mock' : 'live';
 setInterval(tickClock, 1000);
 tickClock();
+
+document.querySelectorAll('#anRange .tab').forEach(el => el.addEventListener('click', () => {
+  document.querySelectorAll('#anRange .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  analyticsDays = Number(el.dataset.days);
+  renderAnalytics();
+}));
 
 document.querySelectorAll('.nav-item[data-view]').forEach(el =>
   el.addEventListener('click', () => switchView(el.dataset.view, el)));
