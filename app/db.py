@@ -1,14 +1,15 @@
-"""Turso (cloud SQLite) logging — replaces the local sqlite3 file so data
-survives restarts/redeploys/sleep cycles on stateless hosts like Render free tier.
+"""Telemetry storage.
 
-Needs two env vars: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN (from the Turso dashboard).
-Same table schema and `?` placeholders as before, so the rest of the app is unchanged.
+- If TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are set (e.g. on Render), data goes
+  to the Turso cloud database and survives restarts.
+- Otherwise (local Docker / bare-metal), it falls back to a local SQLite file at
+  DB_PATH (default: smartcool.db).
+Same schema and `?` placeholders either way.
 """
 import os
+import sqlite3
 import threading
 import time
-
-import turso_serverless
 
 _lock = threading.Lock()
 _conn = None
@@ -31,9 +32,16 @@ CREATE TABLE IF NOT EXISTS events (
 
 def init() -> None:
     global _conn
-    url = os.environ["TURSO_DATABASE_URL"]
-    token = os.environ["TURSO_AUTH_TOKEN"]
-    _conn = turso_serverless.connect(url, auth_token=token)
+    url = os.getenv("TURSO_DATABASE_URL")
+    token = os.getenv("TURSO_AUTH_TOKEN")
+    if url and token:
+        import turso_serverless
+        _conn = turso_serverless.connect(url, auth_token=token)
+        print("[db] using Turso cloud database")
+    else:
+        path = os.getenv("DB_PATH", "smartcool.db")
+        _conn = sqlite3.connect(path, check_same_thread=False)
+        print(f"[db] Turso not configured - using local SQLite at {path}")
     for stmt in _SCHEMA.strip().split(";"):
         stmt = stmt.strip()
         if stmt:
@@ -108,18 +116,33 @@ def recent_events(limit: int = 100):
     return _dicts(rows, _EVENT_COLS)
 
 
-def stats():
+def stats(days=None):
+    """Aggregate telemetry. If `days` is given, only rows newer than now-days.
+
+    `ts` is stored as an ISO-8601 UTC string, so a lexicographic >= against an
+    ISO cutoff selects the correct window.
+    """
     if _conn is None:
-        return {"count": 0}
+        return {"count": 0, "days": days}
+
+    where, params = "", ()
+    if days:
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S")
+        where, params = "WHERE ts >= ?", (cutoff,)
+
     with _lock:
         r = list(_conn.execute(
-            """SELECT COUNT(*), AVG(room_temp), MIN(room_temp), MAX(room_temp),
-                      AVG(humidity), AVG(body_temp),
-                      SUM(CASE WHEN ac_on=1 THEN 1 ELSE 0 END)
-               FROM telemetry"""
+            f"""SELECT COUNT(*), AVG(room_temp), MIN(room_temp), MAX(room_temp),
+                       AVG(humidity),
+                       SUM(CASE WHEN ac_on=1 THEN 1 ELSE 0 END)
+                FROM telemetry {where}""",
+            params,
         ))[0]
         dist = list(_conn.execute(
-            "SELECT comfort, COUNT(*) FROM telemetry GROUP BY comfort ORDER BY COUNT(*) DESC"
+            f"SELECT comfort, COUNT(*) FROM telemetry {where} "
+            "GROUP BY comfort ORDER BY COUNT(*) DESC",
+            params,
         ))
 
     total = r[0] or 0
@@ -128,9 +151,10 @@ def stats():
         return round(v, 1) if v is not None else None
 
     return {
+        "days": days,
         "count": total,
         "avg_temp": rnd(r[1]), "min_temp": r[2], "max_temp": r[3],
-        "avg_humidity": rnd(r[4]), "avg_body": rnd(r[5]),
-        "ac_on_pct": round(100 * r[6] / total, 1) if total else 0,
+        "avg_humidity": rnd(r[4]),
+        "ac_on_pct": round(100 * (r[5] or 0) / total, 1) if total else 0,
         "comfort_distribution": [{"comfort": c, "count": n} for c, n in dist],
     }
