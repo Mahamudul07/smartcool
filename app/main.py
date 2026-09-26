@@ -80,8 +80,11 @@ async def api_events(limit: int = 100):
 
 
 @app.get("/api/stats")
-async def api_stats():
-    return db.stats()
+async def api_stats(days: int | None = None):
+    # days = 3 | 7 | 15 | 30 ; omitted = all time
+    if days is not None and days not in (3, 7, 15, 30):
+        days = None
+    return db.stats(days)
 
 
 # Serve the dashboard at / (index.html). Mounted last so routes win.
